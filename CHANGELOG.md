@@ -6,6 +6,8 @@ Notable changes to `go-keyring`. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-29
+
 ### Added
 
 - `Store` with `Get`, `Set`, `Delete` and the shared-item `GetIn`, `SetIn`, `DeleteIn`, over the OS keyring.
@@ -13,4 +15,5 @@ Notable changes to `go-keyring`. The format follows
 - Flatpak fallback: a portal-sealed file, the host Secret Service, then a plain file, with migration between them; `Plaintext` reports the last.
 - `ErrNotFound`, `ErrTooBig`, `ErrLocked`, `ErrNoProvider` and `ZalandoVersion`.
 
-[Unreleased]: https://github.com/Rethunk-Tech/go-keyring/commits/main
+[Unreleased]: https://github.com/Rethunk-Tech/go-keyring/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Rethunk-Tech/go-keyring/releases/tag/v0.1.0

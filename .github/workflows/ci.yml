@@ -81,3 +81,16 @@ jobs:
               go test -run='^$' -fuzz="^${target}\$" -fuzztime=20s "$pkg"
             done
           done
+
+      # TestLive* run against a real Secret Service (Linux) or Credential Manager (Windows) and pin zalando's
+      # item encoding. KEYRING_LIVE=1 turns a missing backend into a failure; without it they skip. On Linux the
+      # test binary starts its own private bus and unlocked gnome-keyring-daemon, so the runner needs the daemon
+      # and secret-tool (the read-back check) installed.
+      - name: Install Secret Service tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y gnome-keyring libsecret-tools dbus
+
+      - name: Live keyring
+        env:
+          KEYRING_LIVE: "1"
+        run: go test -count=1 -run Live ./...

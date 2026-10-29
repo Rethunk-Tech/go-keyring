@@ -25,7 +25,7 @@ run = "go tool golangci-lint fmt --diff ./..."
 # Vets the module and its tests for every OS it builds a file for; add a GOOS here when a
 # file gains a build tag for it.
 [gates.crosscompile]
-run = "GOOS=windows GOARCH=amd64 go vet ./..."
+run = "GOOS=windows GOARCH=amd64 go vet ./... && GOOS=darwin GOARCH=arm64 go vet ./..."
 
 # Linux lint never type-checks a _windows.go file, so a Windows-only test can stop compiling
 # with every other gate green. `go tool -n` names the host binary; GOOS only picks the files.

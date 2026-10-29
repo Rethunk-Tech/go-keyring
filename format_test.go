@@ -76,7 +76,7 @@ func FuzzUnseal(f *testing.F) {
 // FuzzPlainFile feeds arbitrary bytes, which another process in the sandbox may have written, through both
 // migrations of the plain file. Malformed input must give an error, leave the file in place and write no store.
 func FuzzPlainFile(f *testing.F) {
-	seed, err := os.ReadFile(filepath.Join("testdata", "plain-0.3.json"))
+	seed, err := os.ReadFile(filepath.Join("testdata", "plain.json"))
 	if err != nil {
 		f.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func FuzzPlainFile(f *testing.F) {
 // A plain file written by an earlier release must still migrate: sealed keeps both names, the host keyring gets
 // the store's own item under (Service, name) and the shared one under (shared service, name).
 func TestPlainFixtureMigrates(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join("testdata", "plain-0.3.json"))
+	b, err := os.ReadFile(filepath.Join("testdata", "plain.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

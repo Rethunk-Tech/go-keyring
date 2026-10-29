@@ -11,7 +11,7 @@ Windows-only behaviour runs; `flatpak_test.go` and `live_linux_test.go` are Linu
 ## Shape
 
 - Service, SealInfo and Folder have no defaults, because a derived default lets two programs share a store unchosen, and a wrong value orphans every stored secret.
-- The sealed file is the 12-byte GCM nonce followed by the ciphertext of a JSON object, keyed by `HKDF-SHA256(portal secret, nil salt, SealInfo, 32)`. The file names `secrets` and `secrets.json`, the flat `<service>.<name>` item names, and the tombstone key `"\x00deleted\x00" + name` are stored formats: `testdata/sealed-golden` and `testdata/plain-0.3.json` pin them.
+- The sealed file is the 12-byte GCM nonce followed by the ciphertext of a JSON object, keyed by `HKDF-SHA256(portal secret, nil salt, SealInfo, 32)`. The file names `secrets` and `secrets.json`, the flat `<service>.<name>` item names, and the tombstone key `"\x00deleted\x00" + name` are stored formats: `testdata/sealed-golden` and `testdata/plain.json` pin them.
 - Flatpak detection is per call, not captured in `New`, so a `Store` built at init works once the environment says it is inside one.
 - The test seams (`get`, `set`, `del`, `portalSecret`, `storeDir`) are unexported `Store` fields. Package variables would let one importer's stub rewire every other.
 - No `context.Context` on methods: zalando's calls cannot be cancelled. `ReadTimeout` bounds `Get`; `PortalTimeout` bounds only the portal, and zero means unbounded because a dialog's length is the caller's policy.

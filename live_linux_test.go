@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 	}
 	script := `printf ci | gnome-keyring-daemon --unlock --components=secrets >/dev/null && exec "$0" "$@"`
 	args := append([]string{"--", "sh", "-c", script, os.Args[0]}, os.Args[1:]...)
-	cmd := exec.CommandContext(context.Background(), "dbus-run-session", args...)
+	cmd := exec.CommandContext(context.Background(), "dbus-run-session", args...) //nolint:gosec // re-executes this test binary with its own arguments
 	cmd.Env = append(os.Environ(), liveChildEnv+"=1", "HOME="+home, "XDG_DATA_HOME="+filepath.Join(home, ".local", "share"),
 		"DBUS_SESSION_BUS_ADDRESS=", "XDG_RUNTIME_DIR="+home)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
@@ -71,7 +71,7 @@ func secretTool(t *testing.T, svc, name string) (string, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "secret-tool", "lookup", "service", svc, "username", name).Output()
+	out, err := exec.CommandContext(ctx, "secret-tool", "lookup", "service", svc, "username", name).Output() //nolint:gosec // svc and name are the test's own constants
 	return strings.TrimSpace(string(out)), err
 }
 

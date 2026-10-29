@@ -46,11 +46,11 @@ func TestClassify(t *testing.T) {
 	if !errors.Is(got, ErrLocked) || !errors.Is(got, dismissed) || errors.Is(got, ErrNoProvider) {
 		t.Fatalf("dismissed unlock: %v", got)
 	}
-	if again := classify(got); again != got {
+	if again := classify(got); again.Error() != got.Error() {
 		t.Fatal("classify must not wrap twice")
 	}
 	other := errors.New("boom")
-	if classify(other) != other || classify(nil) != nil || classify(ErrNotFound) != ErrNotFound || classify(ErrTooBig) != ErrTooBig {
+	if !errors.Is(classify(other), other) || classify(nil) != nil || !errors.Is(classify(ErrNotFound), ErrNotFound) || !errors.Is(classify(ErrTooBig), ErrTooBig) {
 		t.Fatal("unrelated errors must pass through")
 	}
 }

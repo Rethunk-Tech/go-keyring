@@ -27,6 +27,10 @@ func flatpakEnv(t *testing.T, portal func(context.Context) ([]byte, error)) (s *
 	return s, dir
 }
 
+func fixedPortal(secret string) func(context.Context) ([]byte, error) {
+	return func(context.Context) ([]byte, error) { return []byte(secret), nil }
+}
+
 func noPortalEnv(t *testing.T) (*Store, string) { return flatpakEnv(t, noPortal) }
 
 func TestFlatpakStore(t *testing.T) {

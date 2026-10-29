@@ -3,6 +3,7 @@ package keyring
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 )
 
@@ -33,10 +34,6 @@ func newStore(t *testing.T) *Store {
 
 func noPortal(context.Context) ([]byte, error) { return nil, errors.New("no portal") }
 
-func fixedPortal(secret string) func(context.Context) ([]byte, error) {
-	return func(context.Context) ([]byte, error) { return []byte(secret), nil }
-}
-
 // ringByService stubs the host Secret Service keyed by service and name.
 func (s *Store) ringByService(ring map[[2]string]string) {
 	s.get = func(svc, name string) (string, error) {
@@ -63,4 +60,17 @@ func (s *Store) ringDown() {
 func (s *Store) resetHost() {
 	s.hostChecked = map[string]bool{}
 	s.hostDone, s.keyDone = false, false
+}
+
+// writeIn writes a file into dir through os.Root, as the production code reads it.
+func writeIn(t *testing.T, dir, name string, b []byte) {
+	t.Helper()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = root.Close() }()
+	if err := root.WriteFile(name, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
 }

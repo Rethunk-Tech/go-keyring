@@ -500,3 +500,26 @@ func TestAdoptHostRetriesAfterStrayError(t *testing.T) {
 		t.Fatalf("retry get = %q, %v", v, err)
 	}
 }
+
+func TestSealAndUnsealRefuseABadKeyOrBlob(t *testing.T) {
+	key := bytes.Repeat([]byte{7}, 32)
+	if _, err := seal([]byte("short"), []byte("x")); err == nil {
+		t.Error("a key of the wrong length sealed")
+	}
+	if _, err := unseal([]byte("short"), []byte("x")); err == nil {
+		t.Error("a key of the wrong length unsealed")
+	}
+	sealed, err := seal(key, []byte("secret"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := unseal(key, sealed[:3]); err == nil {
+		t.Error("a truncated blob unsealed")
+	}
+	if _, err := unseal(bytes.Repeat([]byte{8}, 32), sealed); err == nil {
+		t.Error("another key unsealed")
+	}
+	if got, err := unseal(key, sealed); err != nil || string(got) != "secret" {
+		t.Errorf("round trip = %q, %v", got, err)
+	}
+}

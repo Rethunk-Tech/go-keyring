@@ -69,7 +69,7 @@ func liveStore(t *testing.T) *Store {
 
 func secretTool(t *testing.T, svc, name string) (string, error) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "secret-tool", "lookup", "service", svc, "username", name).Output() //nolint:gosec // svc and name are the test's own constants
 	return strings.TrimSpace(string(out)), err

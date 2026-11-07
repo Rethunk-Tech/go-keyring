@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 )
 
 // a purge error after adoption marks the item checked, so Delete skips the host purge and reports success.
@@ -62,15 +63,43 @@ func TestOwnNameCannotShadowSharedItem(t *testing.T) {
 	}
 }
 
-// a service or name holding a separator must not share a flight with another item.
+// a service or name holding a separator must not share a flight with another item: the second ask has to answer
+// while the first is still blocked in the backend.
 func TestSeparatorsDoNotJoinItems(t *testing.T) {
 	s, _ := flatpakEnv(t, fixedPortal("master"))
 	s.ringByService(map[[2]string]string{{"a\nb", "c"}: "one", {"a", "b\nc"}: "two"})
-	if v, err := s.GetIn("a\nb", "c"); err != nil || v != "one" {
-		t.Fatalf("first = %q, %v", v, err)
+	orig := s.get
+	entered, release := make(chan struct{}), make(chan struct{})
+	s.get = func(svc, name string) (string, error) {
+		if svc == "a\nb" {
+			close(entered)
+			<-release
+		}
+		return orig(svc, name)
 	}
-	if v, err := s.GetIn("a", "b\nc"); err != nil || v != "two" {
-		t.Fatalf("second = %q, %v", v, err)
+	first := make(chan string, 1)
+	go func() { v, _ := s.GetIn("a\nb", "c"); first <- v }()
+	<-entered
+	second := make(chan string, 1)
+	go func() { v, _ := s.GetIn("a", "b\nc"); second <- v }()
+	var got string
+	select {
+	case got = <-second:
+	case <-time.After(2 * time.Second):
+		t.Error("the second item waited on the first's flight")
+		close(release)
+		got = <-second
+	}
+	if got != "two" {
+		t.Errorf("second = %q, want two", got)
+	}
+	select {
+	case <-release:
+	default:
+		close(release)
+	}
+	if v := <-first; v != "one" {
+		t.Errorf("first = %q, want one", v)
 	}
 }
 

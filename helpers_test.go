@@ -58,7 +58,7 @@ func (s *Store) ringDown() {
 
 // resetHost makes the next call probe the host and the portal again.
 func (s *Store) resetHost() {
-	s.hostChecked = map[string]bool{}
+	s.hostChecked = map[itemKey]bool{}
 	s.hostDone, s.keyDone = false, false
 }
 

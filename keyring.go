@@ -36,6 +36,9 @@ type Options struct {
 	OnUnlocked func()
 }
 
+// itemKey names an item in the in-memory maps; a struct, because no separator is safe against a name that holds it.
+type itemKey struct{ service, name string }
+
 // Store is one credential store. Use one Store per Folder per process: the Flatpak store's lock is per Store.
 type Store struct {
 	opts Options
@@ -48,9 +51,9 @@ type Store struct {
 	storeDir     func() (string, error)
 
 	mu       sync.Mutex
-	inflight map[string]*flight
+	inflight map[itemKey]*flight
 	// late holds the values of reads that finished after their caller gave up, for the next Get of that name.
-	late map[string]string
+	late map[itemKey]string
 
 	storeMu sync.Mutex
 	// The portal is asked once per process; a failure is cached so a missing portal is not retried on every call.
@@ -64,7 +67,7 @@ type Store struct {
 	// hostChecked holds the items already looked up in the host keyring this run: a locked host keyring raises an
 	// unlock prompt on every lookup, so each item is asked about once and a later run tries again.
 	hostCheckedMu sync.Mutex
-	hostChecked   map[string]bool
+	hostChecked   map[itemKey]bool
 }
 
 type flight struct {
@@ -96,9 +99,9 @@ func New(o Options) (*Store, error) {
 		get:         zkeyring.Get,
 		set:         zkeyring.Set,
 		del:         zkeyring.Delete,
-		inflight:    map[string]*flight{},
-		late:        map[string]string{},
-		hostChecked: map[string]bool{},
+		inflight:    map[itemKey]*flight{},
+		late:        map[itemKey]string{},
+		hostChecked: map[itemKey]bool{},
 	}
 	s.portalSecret = portal.RetrieveSecret
 	s.storeDir = s.defaultStoreDir
@@ -137,7 +140,10 @@ func (s *Store) Get(name string) (string, error) { return s.GetIn(s.opts.Service
 // GetIn returns the secret another program shares under its own service and name. Outside a Flatpak, and in
 // host-keyring mode, that program can read it too.
 func (s *Store) GetIn(service, name string) (string, error) {
-	key := service + "\n" + name
+	if err := s.checkName(service, name); err != nil {
+		return "", err
+	}
+	key := itemKey{service, name}
 	s.mu.Lock()
 	if v, ok := s.late[key]; ok {
 		delete(s.late, key)
@@ -175,7 +181,7 @@ func (s *Store) GetIn(service, name string) (string, error) {
 }
 
 func (s *Store) run(service, name string, f *flight) {
-	key := service + "\n" + name
+	key := itemKey{service, name}
 	var v string
 	var err error
 	if flatpak.Inside() {
@@ -206,6 +212,9 @@ func (s *Store) Set(name, value string) error { return s.SetIn(s.opts.Service, n
 
 // SetIn stores value under another program's service and name, as GetIn reads it.
 func (s *Store) SetIn(service, name, value string) error {
+	if err := s.checkName(service, name); err != nil {
+		return err
+	}
 	s.forget(service, name)
 	if flatpak.Inside() {
 		return s.flatpakSet(service, name, value)
@@ -214,7 +223,7 @@ func (s *Store) SetIn(service, name, value string) error {
 }
 
 func (s *Store) forget(service, name string) {
-	key := service + "\n" + name
+	key := itemKey{service, name}
 	s.mu.Lock()
 	delete(s.late, key)
 	if f, ok := s.inflight[key]; ok {
@@ -237,12 +246,27 @@ func (s *Store) Delete(name string) error { return s.DeleteIn(s.opts.Service, na
 
 // DeleteIn removes the secret under another program's service and name.
 func (s *Store) DeleteIn(service, name string) error {
+	if err := s.checkName(service, name); err != nil {
+		return err
+	}
 	s.forget(service, name)
 	if flatpak.Inside() {
 		return s.flatpakDelete(service, name)
 	}
 	if err := s.del(service, name); err != nil && !errors.Is(err, ErrNotFound) {
 		return classify(err)
+	}
+	return nil
+}
+
+// checkName refuses an item of the store's own service named like a shared one: the Flatpak files keep both as
+// "<service>.<name>", so the two would be one item.
+func (s *Store) checkName(service, name string) error {
+	if service != s.opts.Service {
+		return nil
+	}
+	if _, _, shared := s.sharedItem(name); shared {
+		return ErrReservedName
 	}
 	return nil
 }

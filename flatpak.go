@@ -195,8 +195,14 @@ func load(path string, key []byte) (map[string]string, error) {
 			return nil, err
 		}
 	}
-	m := map[string]string{}
-	return m, json.Unmarshal(b, &m)
+	var m map[string]string
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+	if m == nil {
+		m = map[string]string{}
+	}
+	return m, nil
 }
 
 // secureDir creates dir and holds it to mode 0700: MkdirAll leaves an existing folder's mode alone, and a symlink or
@@ -409,29 +415,17 @@ func (s *Store) hostItems(service, name string) [][2]string {
 	return items
 }
 
-// firstHostCheck reports whether this is the run's first host lookup of the item, and marks it checked.
-func (s *Store) firstHostCheck(service, name string) bool {
-	s.hostCheckedMu.Lock()
-	defer s.hostCheckedMu.Unlock()
-	k := service + "\x00" + name
-	if s.hostChecked[k] {
-		return false
-	}
-	s.hostChecked[k] = true
-	return true
-}
-
 // hostCheckedAlready reports whether the item has a definite host answer this run.
 func (s *Store) hostCheckedAlready(service, name string) bool {
 	s.hostCheckedMu.Lock()
 	defer s.hostCheckedMu.Unlock()
-	return s.hostChecked[service+"\x00"+name]
+	return s.hostChecked[itemKey{service, name}]
 }
 
 func (s *Store) markHostChecked(service, name string) {
 	s.hostCheckedMu.Lock()
 	defer s.hostCheckedMu.Unlock()
-	s.hostChecked[service+"\x00"+name] = true
+	s.hostChecked[itemKey{service, name}] = true
 }
 
 // adoptHost moves a secret stored in the host keyring, while the portal was missing, into the sealed file. It looks
@@ -452,22 +446,42 @@ func (s *Store) adoptHost(service, name string) (string, error) {
 		if err != nil {
 			return "", classify(err)
 		}
-		if err := s.update(func(m map[string]string) bool { m[s.flatpakName(service, name)] = v; return true }); err != nil {
+		// A Delete that ran while the host read was blocked left a tombstone: the value is the signed-out one.
+		signedOut := false
+		if err := s.update(func(m map[string]string) bool {
+			if _, dead := m[s.tombstone(service, name)]; dead {
+				signedOut = true
+				return false
+			}
+			m[s.flatpakName(service, name)] = v
+			return true
+		}); err != nil {
+			return "", err
+		}
+		if signedOut {
+			return "", ErrNotFound
+		}
+		if err := s.purgeHost(service, name); err != nil {
 			return "", err
 		}
 		s.markHostChecked(service, name)
-		return v, s.purgeHost(service, name)
+		return v, nil
 	}
 	s.markHostChecked(service, name)
 	return "", ErrNotFound
 }
 
-// dropHost removes any host-keyring copy of a secret that lives in the sealed file, once per item per run.
+// dropHost removes any host-keyring copy of a secret that lives in the sealed file, once per item per run: a failed
+// purge is not a check, so the next call tries again.
 func (s *Store) dropHost(service, name string) error {
-	if !s.firstHostCheck(service, name) {
+	if s.hostCheckedAlready(service, name) {
 		return nil
 	}
-	return s.purgeHost(service, name)
+	if err := s.purgeHost(service, name); err != nil {
+		return err
+	}
+	s.markHostChecked(service, name)
+	return nil
 }
 
 func (s *Store) purgeHost(service, name string) error {

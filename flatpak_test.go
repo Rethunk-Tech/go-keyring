@@ -351,7 +351,7 @@ func TestHostItemsAdoptedWhenPortalAppears(t *testing.T) {
 			t.Fatalf("legacy=%v: sealed copy missing: %q, %v", legacy, v, err)
 		}
 		ring[host] = "tok"
-		s.hostChecked = map[string]bool{}
+		s.hostChecked = map[itemKey]bool{}
 		if err := s.DeleteIn(testShared, "team"); err != nil || len(ring) != 0 {
 			t.Fatalf("legacy=%v: delete left %v, %v", legacy, ring, err)
 		}
@@ -471,7 +471,7 @@ func TestSealedDeleteStaysDeleted(t *testing.T) {
 		if err := s.Delete("k"); err != nil {
 			t.Fatal(err)
 		}
-		s.hostChecked = map[string]bool{}
+		s.hostChecked = map[itemKey]bool{}
 		locked = false
 		if v, err := s.Get("k"); err == nil {
 			t.Errorf("getFirst=%v: signed-out secret came back as %q", getFirst, v)

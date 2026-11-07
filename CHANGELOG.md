@@ -6,6 +6,17 @@ Notable changes to `go-keyring`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `ErrReservedName`: `Get`, `Set` and `Delete` refuse a name of the store's own service that starts with a shared service and a dot, which the Flatpak files keep for that shared item.
+
+### Fixed
+
+- A host purge that failed after adoption no longer marks the item checked, so `Delete` retries the purge; `Get` returns the error without the value.
+- A `Get` blocked on the host keyring no longer writes its value back after a `Delete` signed the item out.
+- A plain file holding JSON `null` reads as empty instead of panicking the next write.
+- Services and names holding a newline or NUL no longer collide in the in-memory maps.
+
 ## [0.1.0] - 2026-10-29
 
 ### Added

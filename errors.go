@@ -20,6 +20,9 @@ var (
 	// ErrLocked wraps the backend error when an unlock prompt was dismissed or failed. Nothing is cached: the
 	// next call prompts again.
 	ErrLocked = errors.New("keyring: the keyring stayed locked")
+	// ErrReservedName means an item of the store's own service is named "<shared service>.<name>", which the
+	// Flatpak files keep for that shared service's item.
+	ErrReservedName = errors.New("keyring: the name collides with a shared service's item")
 	// ErrNoProvider wraps the D-Bus error raised when nothing answers as the Secret Service.
 	ErrNoProvider = errors.New("keyring: no Secret Service provider is running")
 )

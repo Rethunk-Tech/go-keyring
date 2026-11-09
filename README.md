@@ -9,14 +9,14 @@
 
 ---
 
-One credential store for a Go desktop app: the OS keyring, with a sealed-file fallback inside a Flatpak. Package `keyring`, module `github.com/Rethunk-Tech/go-keyring`.
+One credential store for a Go desktop app: the OS keyring, with a sealed-file fallback inside a Flatpak. Package `keyring`, module `github.com/Totative/go-keyring`.
 
 A Go desktop app keeps a token in the OS keyring (Secret Service on Linux, Credential Manager on Windows; the macOS Keychain works through the same backend but is untested). Inside a Flatpak, where the session keyring is not reachable by default, the same calls fall back to a file sealed under the XDG Secret portal's per-app secret, then to the host's Secret Service, then to a plain `0600` file. Reads are bounded, so a GUI is never held by an unlock prompt nobody answers.
 
 ## Quick start
 
 ```bash
-go get github.com/Rethunk-Tech/go-keyring
+go get github.com/Totative/go-keyring
 ```
 
 A worked example and the contracts: [HUMANS.md](HUMANS.md).

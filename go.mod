@@ -1,4 +1,4 @@
-module github.com/Rethunk-Tech/go-keyring
+module github.com/Totative/go-keyring
 
 go 1.27.3
 

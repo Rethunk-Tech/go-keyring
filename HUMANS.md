@@ -5,7 +5,7 @@ Run and use `go-keyring`. Internals: [AGENTS.md](AGENTS.md).
 ## Quick start
 
 ```bash
-go get github.com/Rethunk-Tech/go-keyring
+go get github.com/Totative/go-keyring
 ```
 
 ```go
@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Rethunk-Tech/go-keyring"
+	"github.com/Totative/go-keyring"
 )
 
 func main() {

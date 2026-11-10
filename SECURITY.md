@@ -7,8 +7,10 @@ rather than being backported.
 
 ## Reporting a vulnerability
 
-Use GitHub's **private vulnerability reporting** on this repository (Security → Report a
-vulnerability). It stays private until a fix ships.
+Use GitHub's [private vulnerability reporting](https://github.com/Totative/go-keyring/security/advisories/new)
+on this repository (Security → Report a vulnerability). It stays private until a fix ships.
+The organisation's [security policy](https://github.com/Totative/.github/blob/main/SECURITY.md)
+covers the rest, safe harbour included.
 
 Please do not open a public issue for a suspected vulnerability first.
 

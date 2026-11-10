@@ -6,6 +6,17 @@ Notable changes to `go-keyring`. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-10
+
+### Changed
+
+- The module path is now `github.com/Totative/go-keyring`; update imports and the `require` line in `go.mod`.
+- The licence is now Apache-2.0.
+
+### Added
+
+- Each release tarball carries a signed build provenance and an SBOM attestation; check one with `gh attestation verify <file> --owner Totative`.
+
 ## [0.2.0] - 2026-11-07
 
 ### Added
@@ -28,6 +39,7 @@ Notable changes to `go-keyring`. The format follows
 - Flatpak fallback: a portal-sealed file, the host Secret Service, then a plain file, with migration between them; `Plaintext` reports the last.
 - `ErrNotFound`, `ErrTooBig`, `ErrLocked`, `ErrNoProvider` and `ZalandoVersion`.
 
-[Unreleased]: https://github.com/Totative/go-keyring/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Totative/go-keyring/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Totative/go-keyring/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Totative/go-keyring/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Totative/go-keyring/releases/tag/v0.1.0

@@ -22,6 +22,8 @@ The module has one consumer. A new export needs a call site there, not a use for
 Tests are in the same package and exercise unexported code directly, so they are not a reason to
 export anything.
 
+New behaviour lands with a test that fails without it.
+
 ## Dependencies
 
 A new dependency needs a reason the standard library cannot meet.

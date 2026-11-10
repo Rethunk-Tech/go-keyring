@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/go-1.27.3+-00ADD8?logo=go&logoColor=white)](go.mod)
 
 </div>
@@ -42,4 +42,4 @@ A worked example and the contracts: [HUMANS.md](HUMANS.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). © 2026 Rethunk.Tech, LLC.
+Apache-2.0, see [LICENSE](LICENSE). © 2026 Rethunk.Tech, LLC.

@@ -3,9 +3,16 @@ on:
   push:
     tags: ["v*"]
 permissions: {}
+
+# A newer push makes the older run's verdict worthless, so it cancels that run rather than racing it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
       id-token: write

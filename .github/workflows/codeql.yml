@@ -14,6 +14,11 @@ on:
 
 permissions: {}
 
+# A newer push makes the older run's verdict worthless, so it cancels that run rather than racing it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})

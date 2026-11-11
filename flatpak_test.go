@@ -247,6 +247,19 @@ func TestPlaintextReturnsTheResolutionError(t *testing.T) {
 	}
 }
 
+func TestPortalTimeoutZeroLeavesThePortalUnbounded(t *testing.T) {
+	s, _ := flatpakEnv(t, nil)
+	s.portalSecret = func(ctx context.Context) ([]byte, error) {
+		if _, ok := ctx.Deadline(); ok {
+			t.Error("zero PortalTimeout bounded the portal")
+		}
+		return []byte("master"), nil
+	}
+	if err := s.Set("k", "v"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPortalTimeoutIsCachedLikeAnyPortalFailure(t *testing.T) {
 	s, _ := flatpakEnv(t, nil)
 	s.opts.PortalTimeout = 20 * time.Millisecond
@@ -325,6 +338,21 @@ func TestHostKeyringSharedItemNaming(t *testing.T) {
 		}
 		if ring[[2]string{testService, "token"}] != "k" || len(ring) != 1 {
 			t.Fatalf("got %v", ring)
+		}
+	})
+
+	t.Run("a legacy delete error is returned", func(t *testing.T) {
+		s, _ := newEnv(t)
+		boom := errors.New("boom")
+		base := s.del
+		s.del = func(svc, name string) error {
+			if svc == testService && name == testShared+".team" {
+				return boom
+			}
+			return base(svc, name)
+		}
+		if err := s.SetIn(testShared, "team", "tok"); !errors.Is(err, boom) {
+			t.Fatalf("got %v", err)
 		}
 	})
 }
@@ -501,6 +529,18 @@ func TestAdoptHostRetriesAfterStrayError(t *testing.T) {
 	}
 }
 
+func TestDropHostReturnsAStrayPurgeError(t *testing.T) {
+	s, _ := flatpakEnv(t, fixedPortal("master"))
+	if err := s.Set("k", "v"); err != nil {
+		t.Fatal(err)
+	}
+	boom := errors.New("boom")
+	s.del = func(string, string) error { return boom }
+	if err := s.Delete("k"); !errors.Is(err, boom) {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestSealAndUnsealRefuseABadKeyOrBlob(t *testing.T) {
 	key := bytes.Repeat([]byte{7}, 32)
 	if _, err := seal([]byte("short"), []byte("x")); err == nil {
@@ -515,6 +555,14 @@ func TestSealAndUnsealRefuseABadKeyOrBlob(t *testing.T) {
 	}
 	if _, err := unseal(key, sealed[:3]); err == nil {
 		t.Error("a truncated blob unsealed")
+	}
+	g, err := gcm(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Open rejects a nonce with no tag; that is not the truncated-file path.
+	if _, err := unseal(key, make([]byte, g.NonceSize())); err == nil || err.Error() == "keyring: the secrets file is truncated" {
+		t.Errorf("nonce-only blob: %v", err)
 	}
 	if _, err := unseal(bytes.Repeat([]byte{8}, 32), sealed); err == nil {
 		t.Error("another key unsealed")

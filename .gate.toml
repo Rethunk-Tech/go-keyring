@@ -1,3 +1,9 @@
+# Detection's `go test -race ./...` credits a package only for lines its own
+# tests execute and has no per-package floor. This run is that suite plus
+# -coverpkg=./... and the 75% floor.
+[gates.test]
+run = "bash scripts/check-package-coverage.sh"
+
 # `gate` derives build and test from the module, and finds `golangci-lint`,
 # `govulncheck` and `actionlint` only on PATH. A runner has none of the three, so
 # detection there falls back to `go vet` and skips the other two without failing
@@ -21,35 +27,6 @@ run = '[ -n "$CI" ] || ./scripts/actionlint'
 # than a rewrite: a gate that rewrites the tree passes on a file nobody saw.
 [gates.fmt]
 run = "go tool golangci-lint fmt --diff ./..."
-
-# -coverpkg=./... credits a package for statements any test in the module
-# reaches. The floor is per package so a well-tested one cannot carry a
-# neighbour that has none.
-[gates.cover]
-run = '''
-go test -coverpkg=./... -coverprofile=coverage.out ./... && awk '
-NR == 1 { next }
-{
-  split($1, a, ":")
-  n = split(a[1], p, "/")
-  pkg = p[1]
-  for (i = 2; i < n; i++) pkg = pkg "/" p[i]
-  stmts[pkg] += $2
-  if ($3 + 0 > 0) covered[pkg] += $2
-}
-END {
-  err = 0
-  for (pkg in stmts) {
-    pct = 100 * covered[pkg] / stmts[pkg]
-    if (pct < 75) {
-      printf "%s %.1f%% is below the 75%% per-package floor\n", pkg, pct
-      err = 1
-    }
-  }
-  exit err
-}
-' coverage.out
-'''
 
 # Compiles the module and its tests for Windows, where a build-tagged file can
 # break without any Linux check noticing.

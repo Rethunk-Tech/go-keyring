@@ -1,13 +1,17 @@
 name: CI
 
 # The gate on every pull request and every push to main. There is no release workflow: this is a
-# library, and a release is a git tag that consumers require by version.
+# library, and a release is a git tag that consumers require by version. The weekly schedule is a
+# minute that is not on the hour, so govulncheck (inside gate) sees CVEs published against
+# dependencies this repository has not bumped.
 on:
   merge_group:
   pull_request:
   workflow_dispatch:
   push:
     branches: [main]
+  schedule:
+    - cron: "27 4 * * 1"
 
 permissions:
   contents: read

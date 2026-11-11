@@ -6,9 +6,16 @@ on:
   schedule:
     - cron: "23 6 * * 1"
 permissions: {}
+
+# A newer push makes the older run's verdict worthless, so it cancels that run rather than racing it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analysis:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       security-events: write
       id-token: write

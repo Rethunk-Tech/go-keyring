@@ -1,3 +1,9 @@
+# Detection's `go test -race ./...` credits a package only for lines its own
+# tests execute and has no per-package floor. This run is that suite plus
+# -coverpkg=./... and the 75% floor.
+[gates.test]
+run = "bash scripts/check-package-coverage.sh"
+
 # `gate` derives build and test from the module, and finds `golangci-lint`,
 # `govulncheck` and `actionlint` only on PATH. A runner has none of the three, so
 # detection there falls back to `go vet` and skips the other two without failing

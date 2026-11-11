@@ -42,4 +42,4 @@ A worked example and the contracts: [HUMANS.md](HUMANS.md).
 
 ## License
 
-Apache-2.0, see [LICENSE](LICENSE). © 2026 Rethunk.Tech, LLC.
+Apache-2.0, see [LICENSE](LICENSE). © 2026 Damon Blais.

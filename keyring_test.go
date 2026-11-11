@@ -150,6 +150,11 @@ func TestHostKeyringOutsideAFlatpak(t *testing.T) {
 	if err := s.Delete("gone"); err != nil {
 		t.Fatalf("a missing name is not an error: %v", err)
 	}
+	boom := errors.New("boom")
+	s.del = func(string, string) error { return boom }
+	if err := s.Delete("k"); !errors.Is(err, boom) {
+		t.Fatalf("want the backend error, got %v", err)
+	}
 	if _, err := s.Get("gone"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("want ErrNotFound, got %v", err)
 	}

@@ -1,6 +1,7 @@
 package keyring
 
 import (
+	"bytes"
 	"crypto/hkdf"
 	"crypto/sha256"
 	"encoding/json"
@@ -68,8 +69,46 @@ func FuzzUnseal(f *testing.F) {
 		if err != nil {
 			return
 		}
+		if len(plain) > len(data) {
+			t.Fatalf("plaintext %d longer than sealed %d", len(plain), len(data))
+		}
+		resealed, err := seal(key, plain)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := unseal(key, resealed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, plain) {
+			t.Fatal("seal/unseal round-trip")
+		}
 		var m map[string]string
-		_ = json.Unmarshal(plain, &m)
+		if err := json.Unmarshal(plain, &m); err != nil {
+			return
+		}
+		if m == nil {
+			m = map[string]string{}
+		}
+		out, err := json.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m2 map[string]string
+		if err := json.Unmarshal(out, &m2); err != nil {
+			t.Fatal(err)
+		}
+		if m2 == nil {
+			m2 = map[string]string{}
+		}
+		if len(m) != len(m2) {
+			t.Fatalf("json round-trip size %d != %d", len(m), len(m2))
+		}
+		for k, v := range m {
+			if m2[k] != v {
+				t.Fatalf("json round-trip %q: %q != %q", k, v, m2[k])
+			}
+		}
 	})
 }
 
@@ -89,7 +128,7 @@ func FuzzPlainFile(f *testing.F) {
 		if err := os.WriteFile(plain, data, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		_, loadErr := load(plain, nil)
+		m, loadErr := load(plain, nil)
 		s := newStore(t)
 		s.ringByService(map[[2]string]string{})
 		sealErr := s.sealPlain(dir, goldenKey(t))
@@ -101,6 +140,26 @@ func FuzzPlainFile(f *testing.F) {
 			}
 			if _, err := os.Stat(filepath.Join(dir, sealedFile)); !errors.Is(err, os.ErrNotExist) {
 				t.Fatalf("a partial sealed store was written: %v", err)
+			}
+			return
+		}
+		out, err := json.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m2 map[string]string
+		if err := json.Unmarshal(out, &m2); err != nil {
+			t.Fatal(err)
+		}
+		if m2 == nil {
+			m2 = map[string]string{}
+		}
+		if len(m) != len(m2) {
+			t.Fatalf("json round-trip size %d != %d", len(m), len(m2))
+		}
+		for k, v := range m {
+			if m2[k] != v {
+				t.Fatalf("json round-trip %q: %q != %q", k, v, m2[k])
 			}
 		}
 	})

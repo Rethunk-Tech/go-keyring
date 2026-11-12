@@ -94,7 +94,7 @@ jobs:
       # and secret-tool (the read-back check) installed.
       - name: Install Secret Service tools
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y gnome-keyring libsecret-tools dbus
+        run: sudo apt-get update -q && sudo apt-get install -y gnome-keyring libsecret-tools dbus
 
       - name: Live keyring
         env:

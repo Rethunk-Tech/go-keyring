@@ -36,7 +36,7 @@ A worked example and the contracts: [HUMANS.md](HUMANS.md).
 | --- | --- |
 | [HUMANS.md](HUMANS.md) | Running and using the package |
 | [AGENTS.md](AGENTS.md) | Internals, invariants, and why |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Process — commits, tests, docs |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Process: commits, tests, docs |
 | [SECURITY.md](SECURITY.md) | Vulnerability disclosure |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 

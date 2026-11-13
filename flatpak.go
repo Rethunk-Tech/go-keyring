@@ -307,11 +307,14 @@ func (s *Store) flatpakSet(service, name, value string) error {
 		return err
 	}
 	if !host {
-		return s.update(func(m map[string]string) bool {
+		if err := s.update(func(m map[string]string) bool {
 			m[s.flatpakName(service, name)] = value
 			delete(m, s.tombstone(service, name))
 			return true
-		})
+		}); err != nil {
+			return err
+		}
+		return s.purgeHost(service, name)
 	}
 	if err := s.set(service, name, value); err != nil {
 		return classify(err)

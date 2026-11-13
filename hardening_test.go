@@ -181,3 +181,16 @@ func TestGetRetriesHostPurgeAfterAdoptionFailed(t *testing.T) {
 		t.Errorf("host copy survived the second Get")
 	}
 }
+
+// Set writes the sealed file and leaves a host-keyring copy from when the portal was missing.
+func TestSetPurgesHostCopy(t *testing.T) {
+	s, _ := flatpakEnv(t, fixedPortal("master"))
+	ring := map[[2]string]string{{testService, "k"}: "old"}
+	s.ringByService(ring)
+	if err := s.Set("k", "new"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if _, still := ring[[2]string{testService, "k"}]; still {
+		t.Errorf("host copy survived Set")
+	}
+}

@@ -154,7 +154,14 @@ func (s *Store) Plaintext() (bool, error) {
 // portal answers, so they are neither lost to the sealed store nor left readable on disk.
 func (s *Store) sealPlain(dir string, key []byte) error {
 	plain, sealed := filepath.Join(dir, plainFile), filepath.Join(dir, sealedFile)
-	if _, err := os.Lstat(sealed); !errors.Is(err, fs.ErrNotExist) {
+	_, err := os.Lstat(sealed)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if err == nil {
+		if err := safefs.Remove(plain); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 		return nil
 	}
 	if _, err := os.Lstat(plain); errors.Is(err, fs.ErrNotExist) {

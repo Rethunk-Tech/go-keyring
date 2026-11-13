@@ -5,6 +5,7 @@ package keyring
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -192,5 +193,20 @@ func TestSetPurgesHostCopy(t *testing.T) {
 	}
 	if _, still := ring[[2]string{testService, "k"}]; still {
 		t.Errorf("host copy survived Set")
+	}
+}
+
+// sealPlain returns once secrets exists, so a leftover secrets.json beside it is never removed.
+func TestLeftoverPlainFileBesideSealedIsRemoved(t *testing.T) {
+	s, dir := flatpakEnv(t, fixedPortal("master"))
+	if err := s.Set("k", "sealed"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	writeIn(t, dir, plainFile, []byte(`{"k":"plain"}`))
+	if _, err := s.Get("k"); err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, plainFile)); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("secrets.json still present: %v", err)
 	}
 }

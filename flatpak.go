@@ -456,49 +456,53 @@ func (s *Store) adoptHost(service, name string) (string, error) {
 		if err != nil {
 			return "", classify(err)
 		}
-		// A Delete that ran while the host read was blocked left a tombstone: the value is the signed-out one.
-		// A Set that finished in the same window already owns the sealed copy: keep it, still purge the host.
-		signedOut := false
-		kept, hasKept := "", false
-		if err := s.update(func(m map[string]string) bool {
-			if _, dead := m[s.tombstone(service, name)]; dead {
-				signedOut = true
-				return false
-			}
-			fn := s.flatpakName(service, name)
-			if cur, ok := m[fn]; ok {
-				kept, hasKept = cur, true
-				return false
-			}
-			m[fn] = v
-			return true
-		}); err != nil {
-			return "", err
-		}
-		if signedOut {
-			return "", ErrNotFound
-		}
-		if err := s.purgeHost(service, name); err != nil {
-			if !hasKept {
-				_ = s.update(func(m map[string]string) bool {
-					fn := s.flatpakName(service, name)
-					if m[fn] != v {
-						return false
-					}
-					delete(m, fn)
-					return true
-				})
-			}
-			return "", err
-		}
-		s.markHostChecked(service, name)
-		if hasKept {
-			return kept, nil
-		}
-		return v, nil
+		return s.sealAdopted(service, name, v)
 	}
 	s.markHostChecked(service, name)
 	return "", ErrNotFound
+}
+
+// A Delete that ran while the host read was blocked left a tombstone: the value is the signed-out one.
+// A Set that finished in the same window already owns the sealed copy: keep it, still purge the host.
+func (s *Store) sealAdopted(service, name, v string) (string, error) {
+	signedOut := false
+	kept, hasKept := "", false
+	if err := s.update(func(m map[string]string) bool {
+		if _, dead := m[s.tombstone(service, name)]; dead {
+			signedOut = true
+			return false
+		}
+		fn := s.flatpakName(service, name)
+		if cur, ok := m[fn]; ok {
+			kept, hasKept = cur, true
+			return false
+		}
+		m[fn] = v
+		return true
+	}); err != nil {
+		return "", err
+	}
+	if signedOut {
+		return "", ErrNotFound
+	}
+	if err := s.purgeHost(service, name); err != nil {
+		if !hasKept {
+			_ = s.update(func(m map[string]string) bool {
+				fn := s.flatpakName(service, name)
+				if m[fn] != v {
+					return false
+				}
+				delete(m, fn)
+				return true
+			})
+		}
+		return "", err
+	}
+	s.markHostChecked(service, name)
+	if hasKept {
+		return kept, nil
+	}
+	return v, nil
 }
 
 // dropHost removes any host-keyring copy of a secret that lives in the sealed file, once per item per run: a failed

@@ -6,6 +6,10 @@ Notable changes to `go-keyring`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A corrupt secrets file no longer puts a byte of its contents in the error.
+
 ## [0.3.0] - 2026-11-10
 
 ### Changed

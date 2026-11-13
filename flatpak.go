@@ -30,9 +30,8 @@ const (
 // masterKey returns the AES key derived from the portal secret. The caller holds storeMu.
 func (s *Store) masterKey() ([]byte, error) {
 	if s.keyDone {
-		return s.keyVal, s.keyErr
+		return s.keyVal, nil
 	}
-	s.keyDone = true
 	ctx := context.Background()
 	if s.opts.PortalTimeout > 0 {
 		var cancel context.CancelFunc
@@ -40,12 +39,15 @@ func (s *Store) masterKey() ([]byte, error) {
 		defer cancel()
 	}
 	secret, err := s.portalSecret(ctx)
+	if err == nil {
+		s.keyVal, err = hkdf.Key(sha256.New, secret, nil, s.opts.SealInfo, 32)
+	}
 	if err != nil {
 		s.keyErr = err
 		return nil, err
 	}
-	s.keyVal, s.keyErr = hkdf.Key(sha256.New, secret, nil, s.opts.SealInfo, 32)
-	return s.keyVal, s.keyErr
+	s.keyDone = true
+	return s.keyVal, nil
 }
 
 // hostProbeName is a name no secret uses: asking for it only shows whether a Secret Service answers.
@@ -70,10 +72,11 @@ func (s *Store) hostKeyring() (bool, error) {
 	return s.hostVal, nil
 }
 
-// location picks the sealed file when the portal answers, else the host keyring, else the plain file. A sealed file
+// location(write) picks the sealed file when the portal answers, else the host keyring, else the plain file (a write
+// gets ErrPortalUnavailable instead of the plain file). A sealed file
 // with no portal is an error: falling back would hide its contents and let the next write start a second store.
 // host is true when the keyring holds the secrets and path and key are unused.
-func (s *Store) location() (path string, key []byte, host bool, err error) {
+func (s *Store) location(write bool) (path string, key []byte, host bool, err error) {
 	dir, err := s.storeDir()
 	if err != nil {
 		return "", nil, false, err
@@ -86,7 +89,7 @@ func (s *Store) location() (path string, key []byte, host bool, err error) {
 		return filepath.Join(dir, sealedFile), key, false, nil
 	}
 	if _, err := os.Stat(filepath.Join(dir, sealedFile)); err == nil {
-		return "", nil, false, fmt.Errorf("keyring: secrets are sealed and the secret portal is unavailable: %w", kerr)
+		return "", nil, false, fmt.Errorf("keyring: secrets are sealed and the secret portal is unavailable: %w: %w", ErrPortalUnavailable, kerr)
 	}
 	host, herr := s.hostKeyring()
 	if herr != nil {
@@ -94,6 +97,9 @@ func (s *Store) location() (path string, key []byte, host bool, err error) {
 	}
 	if host {
 		return "", nil, true, s.keyringPlain(dir)
+	}
+	if write {
+		return "", nil, false, fmt.Errorf("keyring: the secret portal is unavailable, so nothing is written to a plain file: %w: %w", ErrPortalUnavailable, kerr)
 	}
 	return filepath.Join(dir, plainFile), nil, false, nil
 }
@@ -143,7 +149,7 @@ func (s *Store) Plaintext() (bool, error) {
 		return false, ErrPending
 	}
 	defer s.storeMu.Unlock()
-	_, key, host, err := s.location()
+	_, key, host, err := s.location(false)
 	if err != nil {
 		return false, err
 	}
@@ -290,7 +296,7 @@ func unseal(key, sealed []byte) ([]byte, error) {
 func (s *Store) update(fn func(m map[string]string) bool) error {
 	s.storeMu.Lock()
 	defer s.storeMu.Unlock()
-	path, key, host, err := s.location()
+	path, key, host, err := s.location(true)
 	if err != nil {
 		return err
 	}
@@ -369,7 +375,7 @@ func (s *Store) dropLegacy(service, name string) error {
 func (s *Store) onHost() (bool, error) {
 	s.storeMu.Lock()
 	defer s.storeMu.Unlock()
-	_, _, host, err := s.location()
+	_, _, host, err := s.location(true)
 	return host, err
 }
 
@@ -378,7 +384,7 @@ func (s *Store) flatpakGet(service, name string) (string, error) {
 	var v string
 	var ok bool
 	s.storeMu.Lock()
-	path, key, host, err := s.location()
+	path, key, host, err := s.location(false)
 	switch {
 	case err != nil:
 	case host:

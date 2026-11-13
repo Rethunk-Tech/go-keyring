@@ -25,5 +25,5 @@ Please do not open a public issue for a suspected vulnerability first.
 
 - The caller chooses `Service`, `SealInfo` and `Folder`, and keeps them stable.
 - The OS keyring, the XDG Secret portal and the host Secret Service are trusted. A process running as the same user outside the sandbox can read the keyring by design.
-- The plain `0600` file is unencrypted on purpose, when neither the portal nor a host keyring exists. `Plaintext` reports it so the app can warn the user.
+- The plain `0600` file is unencrypted and is no longer written: only a file an earlier release left behind is read, until the portal or a host keyring answers and moves it. `Plaintext` reports it so the app can warn the user.
 - A process with the same user's access to the data folder can delete the store. That is availability, not confidentiality.

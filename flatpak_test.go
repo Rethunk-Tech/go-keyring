@@ -31,6 +31,14 @@ func fixedPortal(secret string) func(context.Context) ([]byte, error) {
 	return func(context.Context) ([]byte, error) { return []byte(secret), nil }
 }
 
+// seedPlain writes a plain secrets file as an earlier release left it.
+func seedPlain(t *testing.T, dir string, m map[string]string) {
+	t.Helper()
+	if err := save(filepath.Join(dir, plainFile), nil, m); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func noPortalEnv(t *testing.T) (*Store, string) { return flatpakEnv(t, noPortal) }
 
 func TestFlatpakStore(t *testing.T) {
@@ -54,32 +62,46 @@ func TestFlatpakStore(t *testing.T) {
 		}
 	})
 
-	t.Run("no portal falls back to a plain 0600 file", func(t *testing.T) {
+	t.Run("no portal refuses a write and writes no file", func(t *testing.T) {
 		s, dir := noPortalEnv(t)
-		if err := s.Set("api", "tok"); err != nil {
-			t.Fatal(err)
+		err := s.Set("api", "tok")
+		if !errors.Is(err, ErrPortalUnavailable) {
+			t.Fatalf("got %v", err)
 		}
+		if err := s.Delete("api"); !errors.Is(err, ErrPortalUnavailable) {
+			t.Fatalf("delete: %v", err)
+		}
+		if _, err := os.Stat(dir); !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("no store folder expected: %v", err)
+		}
+	})
+
+	t.Run("an existing plain file still reads without the portal", func(t *testing.T) {
+		s, dir := noPortalEnv(t)
+		seedPlain(t, dir, map[string]string{"api": "tok"})
 		if v, err := s.Get("api"); err != nil || v != "tok" {
 			t.Fatalf("got %q, %v", v, err)
 		}
-		fi, err := os.Stat(filepath.Join(dir, "secrets.json"))
-		if err != nil || fi.Mode().Perm() != 0o600 {
-			t.Fatalf("plain file: %v %v", fi, err)
+	})
+
+	t.Run("a failed portal call is retried by the next operation", func(t *testing.T) {
+		s, dir := noPortalEnv(t)
+		if err := s.Set("api", "tok"); !errors.Is(err, ErrPortalUnavailable) {
+			t.Fatalf("got %v", err)
 		}
-		if di, _ := os.Stat(dir); di.Mode().Perm() != 0o700 {
-			t.Fatalf("dir mode %v", di.Mode().Perm())
+		s.portalSecret = fixedPortal("master")
+		if err := s.Set("api", "tok"); err != nil {
+			t.Fatal(err)
 		}
-		if _, err := os.Stat(filepath.Join(dir, "secrets")); err == nil {
-			t.Fatal("no sealed file without a portal")
+		if _, err := os.Stat(filepath.Join(dir, "secrets")); err != nil {
+			t.Fatalf("sealed file expected: %v", err)
 		}
 	})
 
 	t.Run("a plain file is sealed once the portal answers", func(t *testing.T) {
 		s, dir := noPortalEnv(t)
-		if err := s.Set("token", "key-123"); err != nil {
-			t.Fatal(err)
-		}
-		s.portalSecret, s.keyDone = fixedPortal("master"), false
+		seedPlain(t, dir, map[string]string{"token": "key-123"})
+		s.portalSecret = fixedPortal("master")
 		if v, err := s.Get("token"); err != nil || v != "key-123" {
 			t.Fatalf("got %q, %v", v, err)
 		}
@@ -115,9 +137,7 @@ func TestFlatpakStore(t *testing.T) {
 
 	t.Run("neither portal nor keyring is plain text", func(t *testing.T) {
 		s, dir := noPortalEnv(t)
-		if err := s.Set("api", "tok"); err != nil {
-			t.Fatal(err)
-		}
+		seedPlain(t, dir, map[string]string{"api": "tok"})
 		p, err := s.Plaintext()
 		if _, serr := os.Stat(filepath.Join(dir, "secrets.json")); serr != nil || !p || err != nil {
 			t.Fatalf("plain file: %v, Plaintext %v, %v", serr, p, err)
@@ -126,9 +146,7 @@ func TestFlatpakStore(t *testing.T) {
 
 	t.Run("a plain file moves to the keyring once it answers", func(t *testing.T) {
 		s, dir := noPortalEnv(t)
-		if err := s.Set("token", "key-1"); err != nil {
-			t.Fatal(err)
-		}
+		seedPlain(t, dir, map[string]string{"token": "key-1"})
 		ring := map[[2]string]string{}
 		s.ringByService(ring)
 		if v, err := s.Get("token"); err != nil || v != "key-1" || ring[[2]string{testService, "token"}] != "key-1" {
@@ -260,8 +278,8 @@ func TestPortalTimeoutZeroLeavesThePortalUnbounded(t *testing.T) {
 	}
 }
 
-func TestPortalTimeoutIsCachedLikeAnyPortalFailure(t *testing.T) {
-	s, _ := flatpakEnv(t, nil)
+func TestPortalTimeoutIsNotCached(t *testing.T) {
+	s, dir := flatpakEnv(t, nil)
 	s.opts.PortalTimeout = 20 * time.Millisecond
 	calls := 0
 	s.portalSecret = func(ctx context.Context) ([]byte, error) {
@@ -269,18 +287,16 @@ func TestPortalTimeoutIsCachedLikeAnyPortalFailure(t *testing.T) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}
-	// The host keyring is down, so a portal failure lands on the plain file.
 	for range 2 {
-		if err := s.Set("api", "tok"); err != nil {
-			t.Fatal(err)
+		if err := s.Set("api", "tok"); !errors.Is(err, ErrPortalUnavailable) || !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("got %v", err)
 		}
 	}
-	if calls != 1 {
+	if calls != 2 {
 		t.Fatalf("the portal was asked %d times", calls)
 	}
-	p, err := s.Plaintext()
-	if !p || err != nil {
-		t.Fatalf("a timed-out portal leaves the plain file: %v %v", p, err)
+	if _, err := os.Stat(filepath.Join(dir, "secrets.json")); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("a timed-out portal must not leave a plain file: %v", err)
 	}
 }
 

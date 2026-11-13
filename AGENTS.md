@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Package `keyring` is one credential store for a Go desktop app: the OS keyring through zalando/go-keyring, and inside a Flatpak a sealed file, the host keyring or a plain file. Any desktop app that keeps a token imports it. It never imports a consumer package, and every consumer string (service, HKDF info, folder) is an `Options` field.
+Package `keyring` is one credential store for a Go desktop app: the OS keyring through zalando/go-keyring, and inside a Flatpak a sealed file, the host keyring (a plain file is only read, never written). Any desktop app that keeps a token imports it. It never imports a consumer package, and every consumer string (service, HKDF info, folder) is an `Options` field.
 
 ## Gate
 
@@ -16,6 +16,7 @@ Windows-only behaviour runs; `flatpak_test.go` and `live_linux_test.go` are Linu
 - The test seams (`get`, `set`, `del`, `portalSecret`, `storeDir`) are unexported `Store` fields. Package variables would let one importer's stub rewire every other.
 - No `context.Context` on methods: zalando's calls cannot be cancelled. `ReadTimeout` bounds `Get`; `PortalTimeout` bounds only the portal, and zero means unbounded because a dialog's length is the caller's policy.
 - `classify` is idempotent, because a result is classified on every path it returns by.
+- A portal failure is never cached; a write with no portal and no host keyring returns `ErrPortalUnavailable` instead of creating a plain file.
 - A sealed file with no portal is an error, never shadowed by a plain file: a second store would hide the first.
 - Host adoption runs at most once per item per run, only a definite answer marks an item checked, and a tombstone stops adoption, so a signed-out secret stays signed out when its host copy could not be purged.
 - zalando is bumped here first, with the live job green and `ZalandoVersion` changed in the same commit: a zalando release that changes its item encoding orphans every stored item.

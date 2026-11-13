@@ -11,7 +11,7 @@
 
 One credential store for a Go desktop app: the OS keyring, with a sealed-file fallback inside a Flatpak. Package `keyring`, module `github.com/Totative/go-keyring`.
 
-A Go desktop app keeps a token in the OS keyring (Secret Service on Linux, Credential Manager on Windows; the macOS Keychain works through the same backend but is untested). Inside a Flatpak, where the session keyring is not reachable by default, the same calls fall back to a file sealed under the XDG Secret portal's per-app secret, then to the host's Secret Service, then to a plain `0600` file. Reads are bounded, so a GUI is never held by an unlock prompt nobody answers.
+A Go desktop app keeps a token in the OS keyring (Secret Service on Linux, Credential Manager on Windows; the macOS Keychain works through the same backend but is untested). Inside a Flatpak, where the session keyring is not reachable by default, the same calls fall back to a file sealed under the XDG Secret portal's per-app secret, then to the host's Secret Service. While neither answers, writes fail with `ErrPortalUnavailable` instead of going to a plain file; an existing plain `0600` file from an earlier release is still read. Reads are bounded, so a GUI is never held by an unlock prompt nobody answers.
 
 ## Quick start
 
@@ -25,7 +25,7 @@ A worked example and the contracts: [HUMANS.md](HUMANS.md).
 
 - One `Store` with `Get`, `Set` and `Delete`, plus `GetIn`, `SetIn` and `DeleteIn` for an item another program shares.
 - A read behind an unlock prompt returns `ErrPending` after `ReadTimeout`, keeps running, and calls `OnUnlocked` when it completes.
-- Inside a Flatpak: a sealed file (AES-256-GCM), else the host keyring, else a plain file; `Plaintext` says which.
+- Inside a Flatpak: a sealed file (AES-256-GCM), else the host keyring. A failed portal call is not cached, so the next call asks again; with no portal and no host keyring a write returns `ErrPortalUnavailable` and an existing plain file is read only. `Plaintext` reports that file.
 - Items from an earlier fallback are found and moved forward on read, never lost.
 - `ErrNotFound` and `ErrTooBig` are zalando's own values, so `errors.Is` holds against its `MockInit`.
 - Typed `ErrLocked` and `ErrNoProvider` replace raw D-Bus text.

@@ -20,6 +20,9 @@ var (
 	// ErrLocked wraps the backend error when an unlock prompt was dismissed or failed. Nothing is cached: the
 	// next call prompts again.
 	ErrLocked = errors.New("keyring: the keyring stayed locked")
+	// ErrPortalUnavailable wraps the portal failure (timeout, dismissed dialog, no portal) when a write would
+	// land in the plain file, or a sealed file cannot be opened. Nothing is cached: the next call asks again.
+	ErrPortalUnavailable = errors.New("keyring: the secret portal is unavailable")
 	// ErrReservedName means an item of the store's own service is named "<shared service>.<name>", which the
 	// Flatpak files keep for that shared service's item.
 	ErrReservedName = errors.New("keyring: the name collides with a shared service's item")

@@ -447,13 +447,20 @@ func (s *Store) adoptHost(service, name string) (string, error) {
 			return "", classify(err)
 		}
 		// A Delete that ran while the host read was blocked left a tombstone: the value is the signed-out one.
+		// A Set that finished in the same window already owns the sealed copy: keep it, still purge the host.
 		signedOut := false
+		kept, hasKept := "", false
 		if err := s.update(func(m map[string]string) bool {
 			if _, dead := m[s.tombstone(service, name)]; dead {
 				signedOut = true
 				return false
 			}
-			m[s.flatpakName(service, name)] = v
+			fn := s.flatpakName(service, name)
+			if cur, ok := m[fn]; ok {
+				kept, hasKept = cur, true
+				return false
+			}
+			m[fn] = v
 			return true
 		}); err != nil {
 			return "", err
@@ -465,6 +472,9 @@ func (s *Store) adoptHost(service, name string) (string, error) {
 			return "", err
 		}
 		s.markHostChecked(service, name)
+		if hasKept {
+			return kept, nil
+		}
 		return v, nil
 	}
 	s.markHostChecked(service, name)

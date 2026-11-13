@@ -129,3 +129,30 @@ func TestDeleteDuringAdoptionStaysDeleted(t *testing.T) {
 		t.Errorf("signed-out secret came back as %q", v)
 	}
 }
+
+// adoption writes a host value after a concurrent Set, so a newly stored secret is overwritten.
+func TestSetDuringAdoptionKeepsNewValue(t *testing.T) {
+	s, _ := flatpakEnv(t, fixedPortal("master"))
+	s.ringByService(map[[2]string]string{{testService, "k"}: "old"})
+	orig := s.get
+	entered, release := make(chan struct{}), make(chan struct{})
+	s.get = func(svc, name string) (string, error) {
+		v, err := orig(svc, name)
+		if name == "k" && svc == testService && err == nil {
+			close(entered)
+			<-release
+		}
+		return v, err
+	}
+	done := make(chan struct{})
+	go func() { _, _ = s.Get("k"); close(done) }()
+	<-entered
+	if err := s.Set("k", "new"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	close(release)
+	<-done
+	if v, err := s.Get("k"); err != nil || v != "new" {
+		t.Errorf("Get after concurrent Set = %q, %v; want new", v, err)
+	}
+}

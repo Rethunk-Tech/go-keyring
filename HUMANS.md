@@ -55,9 +55,10 @@ func main() {
 | `Get`, `GetIn` | Waits at most `ReadTimeout` (3s by default), then `ErrPending`; later reads of that item fail at once. The late value is served once, with no second backend read. |
 | `Set`, `Delete` and the `In` forms | Not bounded: a locked keyring holds them on the prompt. They discard a read still waiting. A missing name on `Delete` is not an error. |
 | `OnUnlocked` | Runs after a read that outlived `ReadTimeout` completes, or was overtaken by a `Set` or `Delete`. |
-| `Plaintext` | `(true, nil)` only inside a Flatpak with neither portal nor host Secret Service. A busy store gives `(false, ErrPending)`; an unresolvable one `(false, err)`. Outside a Flatpak it is `(false, nil)`. |
+| `Plaintext` | `(true, nil)` only inside a Flatpak with neither portal nor host Secret Service and a plain file left by an earlier release. A busy store gives `(false, ErrPending)`; an unresolvable one `(false, err)`. Outside a Flatpak it is `(false, nil)`. |
 | Flatpak detection | Per call, from `FLATPAK_ID`. Sealed and plain files hold a shared item as `<service>.<name>`, so no other program reads it; sharing holds outside a Flatpak and in host-keyring mode. |
 | `ErrNotFound`, `ErrTooBig` | zalando's values. `ErrTooBig` is Windows' 2,560-byte credential limit. |
+| `ErrPortalUnavailable` | Wraps the portal failure (timeout, dismissed dialog, no portal) on a write that would have gone to the plain file, and on any access to a sealed file. Never cached: the next call asks the portal again. |
 | `ErrLocked`, `ErrNoProvider` | Wrap the backend error. A dismissed unlock is never cached and never a reason to write the plain file. |
 | One `Store` per `Folder` | Two `Store`s on one folder race on the file. |
 | macOS | Compiles and vets; untested. |

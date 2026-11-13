@@ -6,6 +6,15 @@ Notable changes to `go-keyring`. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `ErrPortalUnavailable`, returned when the secret portal fails and a write would have gone to the plain file, or a sealed file cannot be opened.
+
+### Changed
+
+- A failed portal call (timeout, dismissed dialog) is no longer cached for the life of the `Store`: the next operation retries it.
+- With no portal and no host keyring, inside a Flatpak, `Set` and `Delete` return `ErrPortalUnavailable` instead of writing a plain `0600` file. An existing plain file is still read, and moves to the sealed file or host keyring once either answers.
+
 ### Fixed
 
 - A corrupt secrets file no longer puts a byte of its contents in the error.

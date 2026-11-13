@@ -56,7 +56,8 @@ type Store struct {
 	late map[itemKey]string
 
 	storeMu sync.Mutex
-	// The portal is asked once per process; a failure is cached so a missing portal is not retried on every call.
+	// The portal's key is cached once it answers; a failure is kept only as the cause for ErrPortalUnavailable, and
+	// the next operation asks again.
 	keyDone bool
 	keyVal  []byte
 	keyErr  error

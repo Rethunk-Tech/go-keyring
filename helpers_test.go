@@ -63,14 +63,14 @@ func (s *Store) resetHost() {
 }
 
 // writeIn writes a file into dir through os.Root, as the production code reads it.
-func writeIn(t *testing.T, dir, name string, b []byte) {
+func writeIn(t *testing.T, dir string, b []byte) {
 	t.Helper()
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = root.Close() }()
-	if err := root.WriteFile(name, b, 0o600); err != nil {
+	if err := root.WriteFile(plainFile, b, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

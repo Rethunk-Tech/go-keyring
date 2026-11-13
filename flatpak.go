@@ -154,7 +154,14 @@ func (s *Store) Plaintext() (bool, error) {
 // portal answers, so they are neither lost to the sealed store nor left readable on disk.
 func (s *Store) sealPlain(dir string, key []byte) error {
 	plain, sealed := filepath.Join(dir, plainFile), filepath.Join(dir, sealedFile)
-	if _, err := os.Lstat(sealed); !errors.Is(err, fs.ErrNotExist) {
+	_, err := os.Lstat(sealed)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if err == nil {
+		if err := safefs.Remove(plain); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 		return nil
 	}
 	if _, err := os.Lstat(plain); errors.Is(err, fs.ErrNotExist) {
@@ -307,11 +314,14 @@ func (s *Store) flatpakSet(service, name, value string) error {
 		return err
 	}
 	if !host {
-		return s.update(func(m map[string]string) bool {
+		if err := s.update(func(m map[string]string) bool {
 			m[s.flatpakName(service, name)] = value
 			delete(m, s.tombstone(service, name))
 			return true
-		})
+		}); err != nil {
+			return err
+		}
+		return s.purgeHost(service, name)
 	}
 	if err := s.set(service, name, value); err != nil {
 		return classify(err)
@@ -446,29 +456,53 @@ func (s *Store) adoptHost(service, name string) (string, error) {
 		if err != nil {
 			return "", classify(err)
 		}
-		// A Delete that ran while the host read was blocked left a tombstone: the value is the signed-out one.
-		signedOut := false
-		if err := s.update(func(m map[string]string) bool {
-			if _, dead := m[s.tombstone(service, name)]; dead {
-				signedOut = true
-				return false
-			}
-			m[s.flatpakName(service, name)] = v
-			return true
-		}); err != nil {
-			return "", err
-		}
-		if signedOut {
-			return "", ErrNotFound
-		}
-		if err := s.purgeHost(service, name); err != nil {
-			return "", err
-		}
-		s.markHostChecked(service, name)
-		return v, nil
+		return s.sealAdopted(service, name, v)
 	}
 	s.markHostChecked(service, name)
 	return "", ErrNotFound
+}
+
+// A Delete that ran while the host read was blocked left a tombstone: the value is the signed-out one.
+// A Set that finished in the same window already owns the sealed copy: keep it, still purge the host.
+func (s *Store) sealAdopted(service, name, v string) (string, error) {
+	signedOut := false
+	kept, hasKept := "", false
+	if err := s.update(func(m map[string]string) bool {
+		if _, dead := m[s.tombstone(service, name)]; dead {
+			signedOut = true
+			return false
+		}
+		fn := s.flatpakName(service, name)
+		if cur, ok := m[fn]; ok {
+			kept, hasKept = cur, true
+			return false
+		}
+		m[fn] = v
+		return true
+	}); err != nil {
+		return "", err
+	}
+	if signedOut {
+		return "", ErrNotFound
+	}
+	if err := s.purgeHost(service, name); err != nil {
+		if !hasKept {
+			_ = s.update(func(m map[string]string) bool {
+				fn := s.flatpakName(service, name)
+				if m[fn] != v {
+					return false
+				}
+				delete(m, fn)
+				return true
+			})
+		}
+		return "", err
+	}
+	s.markHostChecked(service, name)
+	if hasKept {
+		return kept, nil
+	}
+	return v, nil
 }
 
 // dropHost removes any host-keyring copy of a secret that lives in the sealed file, once per item per run: a failed

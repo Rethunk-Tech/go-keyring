@@ -5,6 +5,7 @@ package keyring
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -40,7 +41,7 @@ func TestNullPlainFileReadsAsEmpty(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	writeIn(t, dir, plainFile, []byte("null"))
+	writeIn(t, dir, []byte("null"))
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Set panicked: %v", r)
@@ -127,5 +128,85 @@ func TestDeleteDuringAdoptionStaysDeleted(t *testing.T) {
 	<-done
 	if v, err := s.Get("k"); err == nil {
 		t.Errorf("signed-out secret came back as %q", v)
+	}
+}
+
+// adoption writes a host value after a concurrent Set, so a newly stored secret is overwritten.
+func TestSetDuringAdoptionKeepsNewValue(t *testing.T) {
+	s, _ := flatpakEnv(t, fixedPortal("master"))
+	s.ringByService(map[[2]string]string{{testService, "k"}: "old"})
+	orig := s.get
+	entered, release := make(chan struct{}), make(chan struct{})
+	s.get = func(svc, name string) (string, error) {
+		v, err := orig(svc, name)
+		if name == "k" && svc == testService && err == nil {
+			close(entered)
+			<-release
+		}
+		return v, err
+	}
+	done := make(chan struct{})
+	go func() { _, _ = s.Get("k"); close(done) }()
+	<-entered
+	if err := s.Set("k", "new"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	close(release)
+	<-done
+	if v, err := s.Get("k"); err != nil || v != "new" {
+		t.Errorf("Get after concurrent Set = %q, %v; want new", v, err)
+	}
+}
+
+// a purge error after adoption leaves the host copy, and the next Get serves the sealed item without retrying.
+func TestGetRetriesHostPurgeAfterAdoptionFailed(t *testing.T) {
+	s, _ := flatpakEnv(t, fixedPortal("master"))
+	ring := map[[2]string]string{{testService, "k"}: "old"}
+	s.ringByService(ring)
+	del := s.del
+	failOnce := true
+	s.del = func(svc, name string) error {
+		if failOnce {
+			failOnce = false
+			return errors.New("transient dbus failure")
+		}
+		return del(svc, name)
+	}
+	if v, err := s.Get("k"); v != "" || err == nil {
+		t.Fatalf("a failed purge must not return the value: %q, %v", v, err)
+	}
+	if v, err := s.Get("k"); err != nil || v != "old" {
+		t.Fatalf("retry Get = %q, %v; want old", v, err)
+	}
+	if _, still := ring[[2]string{testService, "k"}]; still {
+		t.Errorf("host copy survived the second Get")
+	}
+}
+
+// Set writes the sealed file and leaves a host-keyring copy from when the portal was missing.
+func TestSetPurgesHostCopy(t *testing.T) {
+	s, _ := flatpakEnv(t, fixedPortal("master"))
+	ring := map[[2]string]string{{testService, "k"}: "old"}
+	s.ringByService(ring)
+	if err := s.Set("k", "new"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if _, still := ring[[2]string{testService, "k"}]; still {
+		t.Errorf("host copy survived Set")
+	}
+}
+
+// sealPlain returns once secrets exists, so a leftover secrets.json beside it is never removed.
+func TestLeftoverPlainFileBesideSealedIsRemoved(t *testing.T) {
+	s, dir := flatpakEnv(t, fixedPortal("master"))
+	if err := s.Set("k", "sealed"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	writeIn(t, dir, []byte(`{"k":"plain"}`))
+	if _, err := s.Get("k"); err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, plainFile)); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("secrets.json still present: %v", err)
 	}
 }

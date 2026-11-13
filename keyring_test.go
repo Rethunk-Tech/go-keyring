@@ -89,6 +89,32 @@ func TestGetOutlivesTimeoutThenCaches(t *testing.T) {
 	}
 }
 
+// a timed-out Get that later misses never notifies, so a caller waiting on OnUnlocked never retries.
+func TestGetOutlivesTimeoutThenNotifiesOnError(t *testing.T) {
+	s := newStore(t)
+	s.opts.ReadTimeout = 20 * time.Millisecond
+	release := make(chan struct{})
+	s.get = func(string, string) (string, error) {
+		<-release
+		return "", ErrNotFound
+	}
+	unlocked := make(chan struct{}, 1)
+	s.opts.OnUnlocked = func() { unlocked <- struct{}{} }
+
+	if _, err := s.Get("k"); !errors.Is(err, ErrPending) {
+		t.Fatalf("want ErrPending, got %v", err)
+	}
+	close(release)
+	select {
+	case <-unlocked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no unlock notification")
+	}
+	if _, err := s.Get("k"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("retry Get = %v, want ErrNotFound", err)
+	}
+}
+
 func TestSetAndDeleteDiscardAReadStillWaiting(t *testing.T) {
 	for _, del := range []bool{false, true} {
 		s := newStore(t)

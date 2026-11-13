@@ -195,8 +195,8 @@ func (s *Store) run(service, name string, f *flight) {
 		delete(s.inflight, key)
 	}
 	// A stale read is not kept, but its caller was told to wait, so it still hears back and reads the new value.
-	deliver := f.stuck && (f.stale || err == nil)
-	if deliver && !f.stale {
+	deliver := f.stuck
+	if deliver && err == nil && !f.stale {
 		s.late[key] = v
 	}
 	close(f.done)

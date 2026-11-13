@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -48,6 +49,19 @@ func TestNullPlainFileReadsAsEmpty(t *testing.T) {
 		}
 	}()
 	_ = s.Set("x", "y")
+}
+
+// a corrupt secrets file must not echo a byte of its contents through the JSON error.
+func TestCorruptPlainFileErrorHoldsNoContent(t *testing.T) {
+	s, dir := noPortalEnv(t)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeIn(t, dir, []byte(`{"tok":"v"}Q`))
+	_, err := s.Get("tok")
+	if err == nil || strings.Contains(err.Error(), "Q") {
+		t.Fatalf("Get error = %v; want an error without file content", err)
+	}
 }
 
 // an own item whose name starts with a shared service's name collides with that shared item.

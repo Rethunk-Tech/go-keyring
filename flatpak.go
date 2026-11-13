@@ -203,8 +203,9 @@ func load(path string, key []byte) (map[string]string, error) {
 		}
 	}
 	var m map[string]string
+	// json's own error quotes the byte it choked on, which here is a byte of a secret.
 	if err := json.Unmarshal(b, &m); err != nil {
-		return nil, err
+		return nil, errors.New("keyring: the secrets file is not a JSON object of strings")
 	}
 	if m == nil {
 		m = map[string]string{}

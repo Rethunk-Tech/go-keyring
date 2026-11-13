@@ -469,6 +469,16 @@ func (s *Store) adoptHost(service, name string) (string, error) {
 			return "", ErrNotFound
 		}
 		if err := s.purgeHost(service, name); err != nil {
+			if !hasKept {
+				_ = s.update(func(m map[string]string) bool {
+					fn := s.flatpakName(service, name)
+					if m[fn] != v {
+						return false
+					}
+					delete(m, fn)
+					return true
+				})
+			}
 			return "", err
 		}
 		s.markHostChecked(service, name)

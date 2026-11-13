@@ -156,3 +156,28 @@ func TestSetDuringAdoptionKeepsNewValue(t *testing.T) {
 		t.Errorf("Get after concurrent Set = %q, %v; want new", v, err)
 	}
 }
+
+// a purge error after adoption leaves the host copy, and the next Get serves the sealed item without retrying.
+func TestGetRetriesHostPurgeAfterAdoptionFailed(t *testing.T) {
+	s, _ := flatpakEnv(t, fixedPortal("master"))
+	ring := map[[2]string]string{{testService, "k"}: "old"}
+	s.ringByService(ring)
+	del := s.del
+	failOnce := true
+	s.del = func(svc, name string) error {
+		if failOnce {
+			failOnce = false
+			return errors.New("transient dbus failure")
+		}
+		return del(svc, name)
+	}
+	if v, err := s.Get("k"); v != "" || err == nil {
+		t.Fatalf("a failed purge must not return the value: %q, %v", v, err)
+	}
+	if v, err := s.Get("k"); err != nil || v != "old" {
+		t.Fatalf("retry Get = %q, %v; want old", v, err)
+	}
+	if _, still := ring[[2]string{testService, "k"}]; still {
+		t.Errorf("host copy survived the second Get")
+	}
+}

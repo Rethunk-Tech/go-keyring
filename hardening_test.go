@@ -41,7 +41,7 @@ func TestNullPlainFileReadsAsEmpty(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	writeIn(t, dir, plainFile, []byte("null"))
+	writeIn(t, dir, []byte("null"))
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Set panicked: %v", r)
@@ -202,7 +202,7 @@ func TestLeftoverPlainFileBesideSealedIsRemoved(t *testing.T) {
 	if err := s.Set("k", "sealed"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
-	writeIn(t, dir, plainFile, []byte(`{"k":"plain"}`))
+	writeIn(t, dir, []byte(`{"k":"plain"}`))
 	if _, err := s.Get("k"); err != nil {
 		t.Fatalf("get: %v", err)
 	}

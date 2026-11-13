@@ -174,7 +174,7 @@ func TestPlainFixtureMigrates(t *testing.T) {
 	}
 	t.Run("sealed", func(t *testing.T) {
 		dir := t.TempDir()
-		writeIn(t, dir, plainFile, b)
+		writeIn(t, dir, b)
 		key := goldenKey(t)
 		if err := newStore(t).sealPlain(dir, key); err != nil {
 			t.Fatal(err)
@@ -189,7 +189,7 @@ func TestPlainFixtureMigrates(t *testing.T) {
 	})
 	t.Run("host keyring", func(t *testing.T) {
 		dir := t.TempDir()
-		writeIn(t, dir, plainFile, b)
+		writeIn(t, dir, b)
 		s := newStore(t)
 		ring := map[[2]string]string{}
 		s.ringByService(ring)
